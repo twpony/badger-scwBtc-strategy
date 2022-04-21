@@ -53,7 +53,7 @@ def test_is_profitable(vault, strategy, want, randomUser, deployer):
     initial_balance_with_fees = initial_balance * (
         1 - (vault.withdrawalFee() / MAX_BPS)
     )
-    assert endingbalance > initial_balance_with_fees
+    assert endingBalance > initial_balance_with_fees
 
 def test_is_acceptable_apr(vault, strategy, want, keeper, deployer):
     snap = SnapshotManager(vault, strategy, "StrategySnapshot")
