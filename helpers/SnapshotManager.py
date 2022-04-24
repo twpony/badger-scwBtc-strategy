@@ -2,7 +2,12 @@ from brownie import *
 from tabulate import tabulate
 from rich.console import Console
 from helpers.multicall import Multicall
-from helpers.utils import val
+
+from helpers.utils import (
+    val,
+    approx,
+    difference,
+)
 
 from helpers.snapshot.snap import Snap
 
@@ -133,6 +138,7 @@ class SnapshotManager:
         user = overrides["from"].address
         trackedUsers = {"user": user}
         before = self.snap(trackedUsers)
+
         tx = self.sett.withdraw(amount, overrides)
         after = self.snap(trackedUsers)
         if confirm:
@@ -143,16 +149,22 @@ class SnapshotManager:
     def settWithdrawAll(self, overrides, confirm=True):
         user = overrides["from"].address
         trackedUsers = {"user": user}
-        # withdraw all will incur the slippage of treasury sett balance
-        # here set 98% balance to test
         userBalance = self.sett.balanceOf(user)
         before = self.snap(trackedUsers)
+
         tx = self.sett.withdraw(userBalance, overrides)
         after = self.snap(trackedUsers)
         if confirm:
             self.resolver.confirm_withdraw(
                 before, after, {"user": user, "amount": userBalance}, tx
             )
+            # to test the predict of balanceOfPool
+            # the test is valid when deposit all and withdraw all
+            withdrawlFee = before.get("sett.withdrawalFee") * before.get("strategy.balanceOfPool") / 10_000
+            # deposit 95%, so there is 5% in sett
+            sett_reserve = before.balances("want", "sett")
+            # withdraw all to user, to test the user want balance is correct or not
+            assert approx(before.get("strategy.balanceOfPool") - withdrawlFee + sett_reserve, after.balances("want", "user"), 1)
 
     def settWithdrawMost(self, overrides, confirm=True):
         user = overrides["from"].address
@@ -161,6 +173,7 @@ class SnapshotManager:
         # here set 99% balance to test
         userBalance = 0.99 * self.sett.balanceOf(user)
         before = self.snap(trackedUsers)
+
         tx = self.sett.withdraw(userBalance, overrides)
         after = self.snap(trackedUsers)
         if confirm:

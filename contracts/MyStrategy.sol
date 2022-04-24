@@ -10,19 +10,26 @@ import "../interfaces/IUniswapV2Router02.sol";
 import "../interfaces/IVToken.sol";
 import "../interfaces/IERC20Extended.sol";
 import "../interfaces/IVault.sol";
+import "../interfaces/IInterestRateModel.sol";
 
 import "@openzeppelin-contracts-upgradeable/math/MathUpgradeable.sol";
 
 contract MyStrategy is BaseStrategy {
     // constant SCREAM address
-    address public constant comptroller = 0x260E596DAbE3AFc463e75B6CC05d8c46aCAcFB09; //Scream unitroller address
+    address public constant comptroller =
+        0x260E596DAbE3AFc463e75B6CC05d8c46aCAcFB09; //Scream unitroller address
     address public constant iToken = 0x4565DC3Ef685E4775cdF920129111DdF43B9d882; //iToken address scWBtc
-    address public constant screamToken = 0xe0654C8e6fd4D733349ac7E09f6f23DA256bF475; //claimComp Token address; SCREAM token
-    address public constant wftmToken = 0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83; //wFtm Token address
+    address public constant screamToken =
+        0xe0654C8e6fd4D733349ac7E09f6f23DA256bF475; //claimComp Token address; SCREAM token
+    address public constant wftmToken =
+        0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83; //wFtm Token address
+    address public constant interestRateModel =
+        0x7FeC814E6BA6bbE2BDEA6B6D78043c597bf64094; //interest model address
     address[] public markets; //Scream Markets, here is just scWBtc
 
     // constant swap address using Spooky Swap
-    address public constant unirouter = 0xF491e7B69E4244ad4002BC14e878a34207E38c29; //Spooky Swap address
+    address public constant unirouter =
+        0xF491e7B69E4244ad4002BC14e878a34207E38c29; //Spooky Swap address
     address[] public swapToWantRoute; //Scream -> WFtm -> WBtc, three address
 
     uint256 public minWant; // the minimum want balance to leverage or deleverage
@@ -41,6 +48,18 @@ contract MyStrategy is BaseStrategy {
         uint256 _sharesAccrued;
     }
 
+    // iToken params
+    // to restore varialbes to get the iToken storage variable
+    struct ITokenParams {
+        uint256 _amountToken;
+        uint256 _BlockNumber;
+        uint256 _totalBorrows;
+        uint256 _totalReserves;
+        uint256 _totalsupplys;
+        uint256 _cash;
+        uint256 _borrowIndex;
+    }
+
     // // for test; to record sett params
     // struct settParams {
     //     uint256 _withdrawalFee;
@@ -49,7 +68,12 @@ contract MyStrategy is BaseStrategy {
     // }
 
     //Emitted when claimComp harvest
-    event ClaimCompHarvested(address indexed token, uint256 amount, uint256 indexed blockNumber, uint256 timestamp);
+    event ClaimCompHarvested(
+        address indexed token,
+        uint256 amount,
+        uint256 indexed blockNumber,
+        uint256 timestamp
+    );
 
     // event for test //
     // event TestBorrowIncrease(uint256 _amount, uint256 _supplys, uint256 _borrows, uint256 _desireBorrows);
@@ -103,16 +127,24 @@ contract MyStrategy is BaseStrategy {
         @param _vault vault address, this strategy belongs to this vault
         @param _wantConfig want token address, the underlying token address  
     */
-    function initialize(address _vault, address[1] memory _wantConfig) public initializer {
+    function initialize(address _vault, address[1] memory _wantConfig)
+        public
+        initializer
+    {
         __BaseStrategy_init(_vault);
 
         want = _wantConfig[0];
 
         borrowDepth = 5;
 
-        minWant = uint256(uint256(10)**uint256((IERC20Extended(address(want))).decimals())).div(1e5);
+        minWant = uint256(
+            uint256(10)**uint256((IERC20Extended(address(want))).decimals())
+        ).div(1e5);
 
-        minScreamWant = uint256(uint256(10)**uint256((IERC20Extended(address(screamToken))).decimals())).div(1e5);
+        minScreamWant = uint256(
+            uint256(10) **
+                uint256((IERC20Extended(address(screamToken))).decimals())
+        ).div(1e5);
 
         collateralTarget = uint256(1e16).mul(uint256(68)); //0.68 ether
 
@@ -143,7 +175,13 @@ contract MyStrategy is BaseStrategy {
         @notice It's very important all tokens that are meant to be in the strategy to be marked as protected
         @notice this provides security guarantees to the depositors they can't be sweeped away
     */
-    function getProtectedTokens() public view virtual override returns (address[] memory) {
+    function getProtectedTokens()
+        public
+        view
+        virtual
+        override
+        returns (address[] memory)
+    {
         address[] memory protectedTokens = new address[](4);
         protectedTokens[0] = want;
         protectedTokens[1] = iToken;
@@ -207,13 +245,21 @@ contract MyStrategy is BaseStrategy {
     }
 
     function swapComp() internal {
-        uint256 outputBal = IERC20Upgradeable(screamToken).balanceOf(address(this));
+        uint256 outputBal = IERC20Upgradeable(screamToken).balanceOf(
+            address(this)
+        );
 
         // // for test
         // emit TestSwapComp(outputBal);
 
         if (outputBal > minScreamWant) {
-            IUniswapV2Router02(unirouter).swapExactTokensForTokens(outputBal, 0, swapToWantRoute, address(this), now);
+            IUniswapV2Router02(unirouter).swapExactTokensForTokens(
+                outputBal,
+                0,
+                swapToWantRoute,
+                address(this),
+                now
+            );
         }
     }
 
@@ -222,7 +268,11 @@ contract MyStrategy is BaseStrategy {
         @param _amount amount of want to withdraw
         @return _amountActual acturally withdrawn amount of want 
     */
-    function _withdrawSome(uint256 _amount) internal override returns (uint256) {
+    function _withdrawSome(uint256 _amount)
+        internal
+        override
+        returns (uint256)
+    {
         uint256 _balance = IERC20Upgradeable(want).balanceOf(address(this));
         (uint256 _supplys, uint256 _borrows) = getTimelyPosition();
         uint256 _netposition = _supplys.add(_balance).sub(_borrows);
@@ -240,7 +290,9 @@ contract MyStrategy is BaseStrategy {
             //  may test the rounding error, netposition is too small
             if (IERC20Upgradeable(iToken).balanceOf(address(this)) > 1) {
                 // to calculate the borrow position change
-                _positionChange = borrowPositionNeedtoReduce(_supplys.sub(_borrows));
+                _positionChange = borrowPositionNeedtoReduce(
+                    _supplys.sub(_borrows)
+                );
 
                 // /** for test */
                 // emit TestWithdrawSomeNetLessThanAmount(_positionChange, _supplys, _borrows);
@@ -254,18 +306,26 @@ contract MyStrategy is BaseStrategy {
                 // // for test
                 // emit TestWithsomRelBorrowAfter(_tempBalance, _tempSupplys, _tempBorrows);
 
-                _amountActual = MathUpgradeable.min(_amount, IERC20Upgradeable(want).balanceOf(address(this)));
+                _amountActual = MathUpgradeable.min(
+                    _amount,
+                    IERC20Upgradeable(want).balanceOf(address(this))
+                );
             }
         }
         // if netposition can cover withdrawal amount
         else {
             if (_balance < _amount) {
                 // withdraw some asset
-                _positionChange = borrowPositionNeedtoReduce(_amount.sub(_balance));
+                _positionChange = borrowPositionNeedtoReduce(
+                    _amount.sub(_balance)
+                );
 
                 _ReleaseBorrow(_positionChange);
 
-                _amountActual = MathUpgradeable.min(_amount, IERC20Upgradeable(want).balanceOf(address(this)));
+                _amountActual = MathUpgradeable.min(
+                    _amount,
+                    IERC20Upgradeable(want).balanceOf(address(this))
+                );
             }
             // want token balance is enough to cover withdrawal amount
             else {
@@ -290,7 +350,10 @@ contract MyStrategy is BaseStrategy {
         //     TestSettParams._settBalance
         // );
 
-        require(_loss.mul(MAX_BPS).div(_amount) <= withdrawalMaxDeviationThreshold, "Withdrawal Loss is too large!");
+        require(
+            _loss.mul(MAX_BPS).div(_amount) <= withdrawalMaxDeviationThreshold,
+            "Withdrawal Loss is too large!"
+        );
 
         // update debt from vault
         // debt = debt.sub(_amountActual);
@@ -309,16 +372,24 @@ contract MyStrategy is BaseStrategy {
         @param _stake the supply want token balance 
         @return notAll if the unwind times more than iteration 
     */
-    function _IncreaseBorrow(uint256 _amount, uint256 _stake) internal returns (bool notAll) {
+    function _IncreaseBorrow(uint256 _amount, uint256 _stake)
+        internal
+        returns (bool notAll)
+    {
         uint256 i = 0;
         uint256 _tempPositionChange = 0;
-        (, uint256 _collateralFactorMantissa, ) = IComptroller(comptroller).markets(address(iToken));
+        (, uint256 _collateralFactorMantissa, ) = IComptroller(comptroller)
+            .markets(address(iToken));
 
         /** for test */
         // emit TestIncreaseBorrowBegin(_amount, _stake, _collateralFactorMantissa);
 
         while (_amount > minWant) {
-            _tempPositionChange = _Leverage(_amount, _stake, _collateralFactorMantissa);
+            _tempPositionChange = _Leverage(
+                _amount,
+                _stake,
+                _collateralFactorMantissa
+            );
 
             /** for test */
             // emit TestIncreaseBorrowLeverageRound(_amount, _stake, _tempPositionChange, i);
@@ -348,14 +419,20 @@ contract MyStrategy is BaseStrategy {
         // if the position change is tiny, do nothing
         uint8 i = 0;
         uint256 _tempPositionChange = 0;
-        (, uint256 _collateralFactorMantissa, ) = IComptroller(comptroller).markets(address(iToken));
+        (, uint256 _collateralFactorMantissa, ) = IComptroller(comptroller)
+            .markets(address(iToken));
 
         // for test
         // emit TestReleaseBorrowBegin(_amount, _collateralFactorMantissa);
 
         while (_amount > minWant) {
             (uint256 _tempSupply, uint256 _tempBorrow) = getCurrentPosition();
-            _tempPositionChange = _Deleverage(_amount, _tempSupply, _tempBorrow, _collateralFactorMantissa);
+            _tempPositionChange = _Deleverage(
+                _amount,
+                _tempSupply,
+                _tempBorrow,
+                _collateralFactorMantissa
+            );
 
             /** for test */
             // emit TestReleaseBorrowDeleverageRound(_amount, _tempSupply, _tempBorrow, _tempPositionChange, i);
@@ -460,7 +537,10 @@ contract MyStrategy is BaseStrategy {
         @return _supplys the supply balance of this strategy
         @return _borrows the borrow balance of this strategy 
      */
-    function getTimelyPosition() public returns (uint256 _supplys, uint256 _borrows) {
+    function getTimelyPosition()
+        public
+        returns (uint256 _supplys, uint256 _borrows)
+    {
         // accrue interst, exchangeRate * accountTokens[ownver] / 1e18(truncate)
         _supplys = IVToken(iToken).balanceOfUnderlying(address(this));
         // have accrued interest in the above function
@@ -483,8 +563,17 @@ contract MyStrategy is BaseStrategy {
         @return _supplys the supply balance of this strategy
         @return _borrows the borrow balance of this strategy 
      */
-    function getCurrentPosition() public view returns (uint256 _supplys, uint256 _borrows) {
-        (, uint256 _itokenBalance, uint256 _borrowBalance, uint256 _exchangeRate) = IVToken(iToken).getAccountSnapshot(address(this));
+    function getCurrentPosition()
+        public
+        view
+        returns (uint256 _supplys, uint256 _borrows)
+    {
+        (
+            ,
+            uint256 _itokenBalance,
+            uint256 _borrowBalance,
+            uint256 _exchangeRate
+        ) = IVToken(iToken).getAccountSnapshot(address(this));
 
         _borrows = _borrowBalance;
 
@@ -497,7 +586,11 @@ contract MyStrategy is BaseStrategy {
         @param _amount the want token amount to withdraw
         @return _position the borrow position needed to reduce when withdrawing
     */
-    function borrowPositionNeedtoReduce(uint256 _amount) internal view returns (uint256 _position) {
+    function borrowPositionNeedtoReduce(uint256 _amount)
+        internal
+        view
+        returns (uint256 _position)
+    {
         // This function is called after getTimelyPosition, have accrued interest
         // Just use the stored value
         (uint256 _supplys, uint256 _borrows) = getCurrentPosition();
@@ -512,7 +605,9 @@ contract MyStrategy is BaseStrategy {
 
         // to calculate the desired borrow
         // borrow = deposit*c/(1-c);   c = borrow/(borrow+deposit)
-        uint256 _desireBorrows = _desireDeposits.mul(collateralTarget).div(uint256(1e18).sub(collateralTarget));
+        uint256 _desireBorrows = _desireDeposits.mul(collateralTarget).div(
+            uint256(1e18).sub(collateralTarget)
+        );
 
         // borrow position change
         _position = _borrows.sub(_desireBorrows);
@@ -523,7 +618,10 @@ contract MyStrategy is BaseStrategy {
         @param _amount the want token amount to deposit
         @return _position the borrow position needed to increase when depositing
     */
-    function borrowPositionNeedtoIncrease(uint256 _amount) internal returns (uint256 _position) {
+    function borrowPositionNeedtoIncrease(uint256 _amount)
+        internal
+        returns (uint256 _position)
+    {
         // This function is called after getTimelyPosition, have accrued interest
         // Just use the stored value
         (uint256 _supplys, uint256 _borrows) = getTimelyPosition();
@@ -534,7 +632,9 @@ contract MyStrategy is BaseStrategy {
 
         // to calculate the desired borrow
         // borrow = deposit*c/(1-c);   c = borrow/(borrow+deposit)
-        uint256 _desireBorrows = _desireDeposits.mul(collateralTarget).div(uint256(1e18).sub(collateralTarget));
+        uint256 _desireBorrows = _desireDeposits.mul(collateralTarget).div(
+            uint256(1e18).sub(collateralTarget)
+        );
 
         // borrow position change
         // generally the desireBorrows is more than borrows
@@ -560,22 +660,34 @@ contract MyStrategy is BaseStrategy {
         @dev harvest the SCREAM token, called by harvest() external function
         @notice core internal function to harvest
     */
-    function _harvest() internal override returns (TokenAmount[] memory harvested) {
+    function _harvest()
+        internal
+        override
+        returns (TokenAmount[] memory harvested)
+    {
         //  for test
         // (uint256 _testsupplys, uint256 _testborrows) = getCurrentPosition();
         // emit TestHarverstCurrentPosition(_testsupplys, _testborrows);
 
         harvested = new TokenAmount[](1);
 
-        if (IComptroller(comptroller).pendingComptrollerImplementation() == address(0)) {
+        if (
+            IComptroller(comptroller).pendingComptrollerImplementation() ==
+            address(0)
+        ) {
             (uint256 _supplys, uint256 _borrows) = getTimelyPosition();
-            uint256 _wantBalanceBeforeClaim = IERC20Upgradeable(screamToken).balanceOf(address(this));
+            uint256 _wantBalanceBeforeClaim = IERC20Upgradeable(screamToken)
+                .balanceOf(address(this));
 
-            uint256 _wantBalanceBegin = IERC20Upgradeable(want).balanceOf(address(this));
+            uint256 _wantBalanceBegin = IERC20Upgradeable(want).balanceOf(
+                address(this)
+            );
 
             // Get the SCREAM Token Reward
             IComptroller(comptroller).claimComp(address(this), markets);
-            uint256 outputBal = IERC20Upgradeable(screamToken).balanceOf(address(this));
+            uint256 outputBal = IERC20Upgradeable(screamToken).balanceOf(
+                address(this)
+            );
 
             // // for test
             // uint256 testAccruedInterestLeft = IComptroller(comptroller).compAccrued(address(this));
@@ -584,11 +696,19 @@ contract MyStrategy is BaseStrategy {
             harvested[0] = TokenAmount(screamToken, outputBal);
             // Swap from scream token to want token
             if (outputBal > minScreamWant) {
-                IUniswapV2Router02(unirouter).swapExactTokensForTokens(outputBal, 0, swapToWantRoute, address(this), now);
+                IUniswapV2Router02(unirouter).swapExactTokensForTokens(
+                    outputBal,
+                    0,
+                    swapToWantRoute,
+                    address(this),
+                    now
+                );
             }
 
             // to calculate the claim Gain
-            uint256 _wantBalance = IERC20Upgradeable(want).balanceOf(address(this));
+            uint256 _wantBalance = IERC20Upgradeable(want).balanceOf(
+                address(this)
+            );
 
             uint256 _netAsset = _supplys.add(_wantBalance).sub(_borrows);
 
@@ -603,7 +723,12 @@ contract MyStrategy is BaseStrategy {
             // But borrow and supply balance is not leveraged and converted to underlying token, the whole estimated profict
             // is an estimate, not the real profit. There is no need to deleverage and leverage all tokens just to
             // get the real profit.
-            emit ClaimCompHarvested(address(want), _claimGain, block.number, block.timestamp);
+            emit ClaimCompHarvested(
+                address(want),
+                _claimGain,
+                block.number,
+                block.timestamp
+            );
             _reportToVault(_claimGain);
         } else {
             // scream is not working, pause now
@@ -642,12 +767,14 @@ contract MyStrategy is BaseStrategy {
         @return the available comp amount but not be accrued
         @notice estimate is not very exact, we use the past data to predict the future
      */
-    function predictCompAccrued() public view returns (uint256) {
+    function predictCompAccrued() internal view returns (uint256) {
         uint256 _distributionPerBlockSupply;
         uint256 _distributionPerBlockBorrow;
 
         // Scream utilizes the same distribution rate for Supply and Borrow
-        _distributionPerBlockSupply = IComptroller(comptroller).compSpeeds(iToken);
+        _distributionPerBlockSupply = IComptroller(comptroller).compSpeeds(
+            iToken
+        );
         _distributionPerBlockBorrow = _distributionPerBlockSupply;
 
         (uint256 _supplys, uint256 _borrows) = getCurrentPosition();
@@ -655,31 +782,139 @@ contract MyStrategy is BaseStrategy {
         uint256 _totalSupplyToken = IVToken(iToken).totalSupply();
         uint256 _totalBorrows = IVToken(iToken).totalBorrows();
 
-        uint256 _totalSupply = _totalSupplyToken.mul(IVToken(iToken).exchangeRateStored()).div(1e18);
+        uint256 _totalSupply = _totalSupplyToken
+            .mul(IVToken(iToken).exchangeRateStored())
+            .div(1e18);
 
         // supply block distribution belongs to this strategy
         uint256 _blockShareSupply = 0;
         if (_totalSupply > 0) {
-            _blockShareSupply = _supplys.mul(_distributionPerBlockSupply).div(_totalSupply);
+            _blockShareSupply = _supplys.mul(_distributionPerBlockSupply).div(
+                _totalSupply
+            );
         }
 
         // borrow block distribution belongs to this strategy
         uint256 _blockShareBorrow = 0;
         if (_totalBorrows > 0) {
-            _blockShareBorrow = _borrows.mul(_distributionPerBlockBorrow).div(_totalBorrows);
+            _blockShareBorrow = _borrows.mul(_distributionPerBlockBorrow).div(
+                _totalBorrows
+            );
         }
 
         // Distribution Calculation
         DistributionParams memory Dparams;
-        Dparams._lastSupplyBlock = IComptroller(comptroller).compSupplyState(iToken).block;
-        Dparams._lastBorrowBlock = IComptroller(comptroller).compBorrowState(iToken).block;
-        Dparams._sharesSupply = _blockShareSupply * (getBlockNumber().sub(Dparams._lastSupplyBlock));
-        Dparams._sharesBorrow = _blockShareBorrow * (getBlockNumber().sub(Dparams._lastBorrowBlock));
+        Dparams._lastSupplyBlock = IComptroller(comptroller)
+            .compSupplyState(iToken)
+            .block;
+        Dparams._lastBorrowBlock = IComptroller(comptroller)
+            .compBorrowState(iToken)
+            .block;
+        Dparams._sharesSupply =
+            _blockShareSupply *
+            (getBlockNumber().sub(Dparams._lastSupplyBlock));
+        Dparams._sharesBorrow =
+            _blockShareBorrow *
+            (getBlockNumber().sub(Dparams._lastBorrowBlock));
 
         // get the accrued distribution but not transfer
-        Dparams._sharesAccrued = IComptroller(comptroller).compAccrued(address(this));
+        Dparams._sharesAccrued = IComptroller(comptroller).compAccrued(
+            address(this)
+        );
 
-        return (Dparams._sharesSupply).add(Dparams._sharesBorrow).add(Dparams._sharesAccrued);
+        return
+            (Dparams._sharesSupply).add(Dparams._sharesBorrow).add(
+                Dparams._sharesAccrued
+            );
+    }
+
+    /**
+        @dev predict the supply and borrow
+        @return _supplys  the total supply including the claimable interest
+        @return _borrows  the total borrow including the claimable interest 
+     */
+    function predictSupplyBorrow()
+        internal
+        view
+        returns (uint256 _supplys, uint256 _borrows)
+    {
+        uint256 _BlockNumberCurrent = block.number;
+        // some important storage variable in iToken
+        ITokenParams memory _ITokenparams;
+        _ITokenparams._amountToken = IVToken(iToken).balanceOf(address(this));
+
+        if (_ITokenparams._amountToken == 0) {
+            return (0, 0);
+        }
+
+        _ITokenparams._BlockNumber = IVToken(iToken).accrualBlockNumber();
+        _ITokenparams._totalBorrows = IVToken(iToken).totalBorrows();
+        _ITokenparams._totalReserves = IVToken(iToken).totalReserves();
+        _ITokenparams._totalsupplys = IVToken(iToken).totalSupply();
+        _ITokenparams._cash = IERC20Upgradeable(want).balanceOf(iToken);
+        _ITokenparams._borrowIndex = IVToken(iToken).borrowIndex();
+
+        uint256 _borrowRate = IInterestRateModel(interestRateModel)
+            .getBorrowRate(
+                _ITokenparams._cash,
+                _ITokenparams._totalBorrows,
+                _ITokenparams._totalReserves
+            );
+
+        uint256 _reserveFactor = IVToken(iToken).reserveFactorMantissa();
+
+        /*
+         * Calculate the interest accumulated into borrows and reserves and the new index:
+         *  simpleInterestFactor = borrowRate * blockDelta
+         *  interestAccumulated = simpleInterestFactor * totalBorrows
+         *  totalBorrowsNew = interestAccumulated + totalBorrows
+         *  totalReservesNew = interestAccumulated * reserveFactor + totalReserves
+         *  borrowIndexNew = simpleInterestFactor * borrowIndex + borrowIndex
+         */
+        uint256 _blockDelta = _BlockNumberCurrent.sub(
+            _ITokenparams._BlockNumber
+        );
+
+        uint256 _simpleInterestFactor = _blockDelta.mul(_borrowRate);
+        uint256 _interestAccumulated = _simpleInterestFactor
+            .mul(_ITokenparams._totalBorrows)
+            .div(uint256(1e18));
+
+        ITokenParams memory _ITokenparamsUpdate;
+        _ITokenparamsUpdate._totalBorrows = _interestAccumulated.add(
+            _ITokenparams._totalBorrows
+        );
+        _ITokenparamsUpdate._totalReserves = _reserveFactor
+            .mul(_interestAccumulated)
+            .div(uint256(1e18))
+            .add(_ITokenparams._totalReserves);
+
+        _ITokenparamsUpdate._borrowIndex = _simpleInterestFactor
+            .mul(_ITokenparams._borrowIndex)
+            .div(uint256(1e18))
+            .add(_ITokenparams._borrowIndex);
+
+        uint256 _cashPlusBorrowsMinusReserves = (_ITokenparams._cash)
+            .add(_ITokenparamsUpdate._totalBorrows)
+            .sub(_ITokenparamsUpdate._totalReserves);
+
+        // to calculate exchangeRate and supplys
+        uint256 _totalSupply = IVToken(iToken).totalSupply();
+        uint256 _exchangeRate = _cashPlusBorrowsMinusReserves
+            .mul(uint256(1e18))
+            .div(_totalSupply);
+
+        _supplys = _exchangeRate.mul(_ITokenparams._amountToken).div(
+            uint256(1e18)
+        );
+
+        // to calculate the borrows
+        uint256 _tempBorrowBalance = IVToken(iToken).borrowBalanceStored(
+            address(this)
+        );
+        _borrows = _tempBorrowBalance.mul(_ITokenparamsUpdate._borrowIndex).div(
+                _ITokenparams._borrowIndex
+            );
     }
 
     /**
@@ -687,18 +922,27 @@ contract MyStrategy is BaseStrategy {
         @notice the unaccrued Comp needs to estimate
         @return _balanceInPool the balance in pool
     */
-    function balanceOfPool() public view override returns (uint256 _balanceInPool) {
-        (uint256 _supplys, uint256 _borrows) = getCurrentPosition();
+    function balanceOfPool()
+        public
+        view
+        override
+        returns (uint256 _balanceInPool)
+    {
+        // predict Supplys and Borrows
+        (uint256 _supplys, uint256 _borrows) = predictSupplyBorrow();
 
         // the estimate claimable comp, but not transferred
         uint256 _compPredict = predictCompAccrued();
 
-        uint256 _compBal = IERC20Upgradeable(screamToken).balanceOf(address(this));
+        uint256 _compBal = IERC20Upgradeable(screamToken).balanceOf(
+            address(this)
+        );
         uint256 _claimableComp = _compBal.add(_compPredict);
 
         if (_claimableComp > 0) {
             // get the exchange value from comp to want
-            uint256[] memory tempAmounts = IUniswapV2Router02(unirouter).getAmountsOut(_claimableComp, swapToWantRoute);
+            uint256[] memory tempAmounts = IUniswapV2Router02(unirouter)
+                .getAmountsOut(_claimableComp, swapToWantRoute);
             _claimableComp = tempAmounts[tempAmounts.length - 1];
 
             _balanceInPool = _supplys.add(_claimableComp).sub(_borrows);
@@ -711,9 +955,17 @@ contract MyStrategy is BaseStrategy {
         @dev Return the balance of rewards that the strategy has accrued
         @notice Used for offChain APY and Harvest Health monitoring
     */
-    function balanceOfRewards() public view override returns (TokenAmount[] memory rewards) {
+    function balanceOfRewards()
+        public
+        view
+        override
+        returns (TokenAmount[] memory rewards)
+    {
         rewards = new TokenAmount[](1);
-        rewards[0] = TokenAmount(screamToken, IERC20Upgradeable(screamToken).balanceOf(address(this)));
+        rewards[0] = TokenAmount(
+            screamToken,
+            IERC20Upgradeable(screamToken).balanceOf(address(this))
+        );
         return rewards;
     }
 
@@ -733,9 +985,13 @@ contract MyStrategy is BaseStrategy {
     */
     function setCollateralTarget(uint256 _collateralTarget) external {
         _onlyAuthorizedActors();
-        (, uint256 _collateralFactorMantissa, ) = IComptroller(comptroller).markets(address(iToken));
+        (, uint256 _collateralFactorMantissa, ) = IComptroller(comptroller)
+            .markets(address(iToken));
         // require collateralFactor > 0 and < collateralFactorMantissa
-        require(_collateralFactorMantissa > _collateralTarget && _collateralTarget > 0);
+        require(
+            _collateralFactorMantissa > _collateralTarget &&
+                _collateralTarget > 0
+        );
         collateralTarget = _collateralTarget;
     }
 

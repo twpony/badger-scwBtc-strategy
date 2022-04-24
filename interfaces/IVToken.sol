@@ -9,6 +9,10 @@ interface IVToken {
 
     function totalSupply() external view returns (uint256);
 
+    function totalReserves() external view returns (uint256);
+
+    function borrowIndex() external view returns (uint256);
+
     function exchangeRateStored() external view returns (uint256);
 
     function mint(uint256 mintAmount) external returns (uint256);
@@ -25,7 +29,10 @@ interface IVToken {
 
     function balanceOfUnderlying(address owner) external returns (uint256);
 
-    function borrowBalanceStored(address account) external view returns (uint256);
+    function borrowBalanceStored(address account)
+        external
+        view
+        returns (uint256);
 
     function comptroller() external returns (address);
 
@@ -38,4 +45,8 @@ interface IVToken {
             uint256,
             uint256
         );
+
+    function accrualBlockNumber() external view returns (uint256);
+
+    function reserveFactorMantissa() external view returns (uint256);
 }
