@@ -1,6 +1,6 @@
 from helpers.StrategyCoreResolver import StrategyCoreResolver
 from rich.console import Console
-# add test function
+
 from helpers.utils import (
     approx,
     difference,
@@ -31,7 +31,7 @@ class StrategyResolver(StrategyCoreResolver):
         Specifies extra check for ordinary operation on deposit
         Use this to verify that balances in the get_strategy_destinations are properly set
         """
-        # Add new test
+
         # to chek balance of sett, whether the sett balance increases by deposit amount
         assert difference(
             after.get("sett.balance") - before.get("sett.balance"),
@@ -128,6 +128,7 @@ class StrategyResolver(StrategyCoreResolver):
         assert difference(fee_govern, delta_treasury, 1)
         assert delta_totalsupply == delta_strategist + delta_treasury
 
+
     def confirm_tend(self, before, after, tx):
         """
         Tend Should;
@@ -158,9 +159,9 @@ class StrategyResolver(StrategyCoreResolver):
         borrowIncrease = tendAmount * collateralRatio / (1-collateralRatio)
         poolIncrease = after.get("strategy.balanceOfPool") - before.get("strategy.balanceOfPool")
 
-        # interest has accrued
+        # to test the accrued interest
         assert supplyIncrease <= (supplyAfter-supplyBefore)
-        # interest has accrued
+        # to test the accrued interest
         assert borrowIncrease <= (borrowAfter-borrowBefore)
-        # pool include the claimable Comp
+        # pool includes the claimable Comp
         assert poolIncrease >= ((supplyAfter - borrowAfter) - (supplyBefore - borrowBefore))

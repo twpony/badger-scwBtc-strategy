@@ -7,15 +7,12 @@ def approx(actual, expected, percentage_threshold):
         return True
     return diff < (actual * percentage_threshold // 100)
 
-# add diff
+# Assert the difference of two values is in threshold
 def difference(amountA, amountB, threshold):
     diff = int(abs(amountA - amountB))
     if diff > threshold:
         return False
-    
     return True
-
-
 
 def val(amount=0, decimals=18, token=None):
     # return amount

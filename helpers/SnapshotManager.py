@@ -37,7 +37,6 @@ class SnapshotManager:
         self.addEntity("treasury", self.sett.treasury())
         self.addEntity("strategist", self.strategy.strategist())
 
-        # these statement seems useless
         destinations = self.resolver.get_strategy_destinations()
         for key, dest in destinations.items():
             self.addEntity(key, dest)
@@ -80,7 +79,6 @@ class SnapshotManager:
         return StrategyResolver(self)
 
     def settTend(self, trackuser, overrides, confirm=True):
-        # user = overrides["from"].address
         user = trackuser
         trackedUsers = {"user": user}
         before = self.snap(trackedUsers)
@@ -90,7 +88,6 @@ class SnapshotManager:
             self.resolver.confirm_tend(before, after, tx)
 
     def settHarvest(self, trackuser, overrides, confirm=True):
-        # user = overrides["from"].address
         user = trackuser
         trackedUsers = {"user": user}
         before = self.snap(trackedUsers)
@@ -123,9 +120,7 @@ class SnapshotManager:
                 before, after, {"user": user, "amount": userBalance}
             )
 
-    # Add test
     def settEarn(self, trackuser, overrides, confirm=True):
-        # user = overrides["from"].address
         user = trackuser
         trackedUsers = {"user": user}
         before = self.snap(trackedUsers)
@@ -159,7 +154,6 @@ class SnapshotManager:
                 before, after, {"user": user, "amount": userBalance}, tx
             )
             # to test the predict of balanceOfPool
-            # the test is valid when deposit all and withdraw all
             withdrawlFee = before.get("sett.withdrawalFee") * before.get("strategy.balanceOfPool") / 10_000
             # deposit 95%, so there is 5% in sett
             sett_reserve = before.balances("want", "sett")
@@ -181,8 +175,6 @@ class SnapshotManager:
                 before, after, {"user": user, "amount": userBalance}, tx
             )
 
-    # withdraw all will induce large slippage when the treasury sett balance is very small
-    # so we set to test withdraw 98% balance here
 
     def format(self, key, value):
         if type(value) is int:

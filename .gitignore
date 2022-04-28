@@ -3,6 +3,8 @@ __pycache__
 .hypothesis/
 build/
 reports/
+venv/
+.husky/
 .env
 
 node_modules/
